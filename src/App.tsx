@@ -6,7 +6,6 @@ import SummaryCards from './components/SummaryCards';
 import FinancialComparison from './components/FinancialComparison';
 import NetworkComparison from './components/NetworkComparison';
 import NetworkTable from './components/NetworkTable';
-import DecisionMatrix from './components/DecisionMatrix';
 import ConsultativeReading from './components/ConsultativeReading';
 import Recommendations from './components/Recommendations';
 import LuminusDifferentials from './components/LuminusDifferentials';
@@ -37,8 +36,6 @@ export default function App() {
       <FinancialComparison cenario={cenario} />
       <NetworkComparison />
       <NetworkTable key={`network-${selectedId}`} cenario={cenario} />
-      {/* Matriz rebuilds on scenario change via key */}
-      <DecisionMatrix key={`matrix-${selectedId}`} cenario={cenario} />
       <ConsultativeReading cenario={cenario} />
       <Recommendations cenario={cenario} />
       <LuminusDifferentials />
