@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { prestadores, cidadesDisponiveis, tiposDisponiveis, getStatusForPlan } from '../data/rede';
+import { prestadores, cidadesDisponiveis, getStatusForPlan } from '../data/rede';
 import type { StatusPrestador, TipoPrestador } from '../data/rede';
 import { legendasRede } from '../data/legendas';
 import type { Cenario, PlanoNoCenario } from '../data/cenarios';
@@ -10,21 +10,31 @@ interface Props {
 
 const CITY_OPTIONS = cidadesDisponiveis.filter(c => c !== 'Todas');
 
+const SP_ZONES = ['SP Centro', 'SP Zona Leste', 'SP Zona Norte', 'SP Zona Oeste', 'SP Zona Sul', 'São Paulo'];
+const GRANDE_SP = [
+  'Arujá', 'Barueri', 'Caieiras', 'Cajamar', 'Carapicuíba', 'Cotia', 'Diadema',
+  'Embu das Artes', 'Ferraz de Vasconcelos', 'Franco da Rocha', 'Guarulhos',
+  'Itapecerica da Serra', 'Itapevi', 'Itaquaquecetuba', 'Mauá', 'Mogi das Cruzes',
+  'Osasco', 'Ribeirão Pires', 'Santo André', 'São Bernardo do Campo',
+  'São Caetano do Sul', 'Suzano', 'Taboão da Serra',
+];
+const DEFAULT_CITIES = [...SP_ZONES, ...GRANDE_SP].filter(c => CITY_OPTIONS.includes(c));
+
 export default function NetworkTable({ cenario }: Props) {
   const amilPlanos = cenario.planos.filter(p => p.operadora === 'Amil');
   const sulaPlanos = cenario.planos.filter(p => p.operadora === 'SulAmérica');
 
   const [selectedPlan, setSelectedPlan] = useState<PlanoNoCenario>(cenario.planos[0]);
-  const [cidades, setCidades] = useState<string[]>([]);  // empty = all
-  const [tipo, setTipo] = useState('Todos');
-  const [status, setStatus] = useState('Todos');
+  const [cidades, setCidades] = useState<string[]>(DEFAULT_CITIES);
+  const [categoria, setCategoria] = useState<'Todos' | 'Hospital' | 'Laboratório'>('Todos');
+  const [status, setStatus] = useState<string>('ganho');
   const [busca, setBusca] = useState('');
 
   const handlePlanSelect = (plan: PlanoNoCenario) => {
     setSelectedPlan(plan);
-    setCidades([]);
-    setTipo('Todos');
-    setStatus('Todos');
+    setCidades(DEFAULT_CITIES);
+    setCategoria('Todos');
+    setStatus('ganho');
     setBusca('');
   };
 
@@ -36,12 +46,16 @@ export default function NetworkTable({ cenario }: Props) {
 
   const clearCidades = () => setCidades([]);
 
+  const LAB_TIPOS: TipoPrestador[] = ['LAB'];
+  const HOSP_TIPOS: TipoPrestador[] = ['H', 'H¹', 'M', 'PS', 'PS¹', 'PA', 'PSP'];
+
   // Filter prestadores
   const filtered = prestadores.filter(p => {
     const st = getStatusForPlan(p, selectedPlan.nome);
     if (st === null) return false;
     if (cidades.length > 0 && !cidades.includes(p.cidade)) return false;
-    if (tipo !== 'Todos' && !p.tipo.includes(tipo as TipoPrestador)) return false;
+    if (categoria === 'Laboratório' && !p.tipo.some(t => LAB_TIPOS.includes(t))) return false;
+    if (categoria === 'Hospital' && !p.tipo.some(t => HOSP_TIPOS.includes(t))) return false;
     if (status !== 'Todos' && st !== status) return false;
     if (busca) {
       const q = busca.toLowerCase();
@@ -51,9 +65,16 @@ export default function NetworkTable({ cenario }: Props) {
   });
 
   const allForPlan = prestadores.filter(p => getStatusForPlan(p, selectedPlan.nome) !== null);
-  const mantidos = allForPlan.filter(p => getStatusForPlan(p, selectedPlan.nome) === 'mantido').length;
-  const ganhos   = allForPlan.filter(p => getStatusForPlan(p, selectedPlan.nome) === 'ganho').length;
-  const perdidos = allForPlan.filter(p => getStatusForPlan(p, selectedPlan.nome) === 'perdido').length;
+  // Badges reflect city + categoria filters
+  const cityFiltered = allForPlan.filter(p => {
+    if (cidades.length > 0 && !cidades.includes(p.cidade)) return false;
+    if (categoria === 'Laboratório' && !p.tipo.some(t => LAB_TIPOS.includes(t))) return false;
+    if (categoria === 'Hospital' && !p.tipo.some(t => HOSP_TIPOS.includes(t))) return false;
+    return true;
+  });
+  const mantidos = cityFiltered.filter(p => getStatusForPlan(p, selectedPlan.nome) === 'mantido').length;
+  const ganhos   = cityFiltered.filter(p => getStatusForPlan(p, selectedPlan.nome) === 'ganho').length;
+  const perdidos = cityFiltered.filter(p => getStatusForPlan(p, selectedPlan.nome) === 'perdido').length;
 
   const badgeStatus = (st: StatusPrestador | null) => {
     if (st === 'mantido') return <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#4ACA8A', background: 'rgba(26,138,90,0.12)', border: '1px solid rgba(26,138,90,0.3)', borderRadius: 9999, padding: '0.2rem 0.65rem', whiteSpace: 'nowrap' }}>✓ Mantido</span>;
@@ -116,7 +137,29 @@ export default function NetworkTable({ cenario }: Props) {
             style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, padding: '0.6rem 1rem', color: '#F8F9FC', fontFamily: 'DM Sans, sans-serif', fontSize: '0.85rem', outline: 'none', flex: '1 1 200px', minWidth: 160 }}
           />
           <CidadeMultiSelect selected={cidades} onToggle={toggleCidade} onClear={clearCidades} />
-          <Select value={tipo} onChange={setTipo} options={['Todos', ...tiposDisponiveis]} label="Tipo" />
+          {/* Categoria: Hospital / Laboratório */}
+          <div style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, overflow: 'hidden' }}>
+            {(['Todos', 'Hospital', 'Laboratório'] as const).map(cat => (
+              <button
+                key={cat}
+                onClick={() => setCategoria(cat)}
+                style={{
+                  padding: '0.6rem 0.85rem',
+                  fontSize: '0.82rem',
+                  fontFamily: 'DM Sans, sans-serif',
+                  border: 'none',
+                  borderRight: cat !== 'Laboratório' ? '1px solid rgba(255,255,255,0.1)' : 'none',
+                  cursor: 'pointer',
+                  background: categoria === cat ? 'rgba(201,151,58,0.18)' : 'transparent',
+                  color: categoria === cat ? '#E8B85A' : '#7A90A8',
+                  fontWeight: categoria === cat ? 600 : 400,
+                  transition: 'all 0.15s',
+                }}
+              >
+                {cat === 'Todos' ? 'Todos' : cat === 'Hospital' ? '🏥 Hospitais' : '🔬 Labs'}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Active city chips */}
@@ -136,7 +179,7 @@ export default function NetworkTable({ cenario }: Props) {
 
         {/* Results count */}
         <div style={{ fontSize: '0.8rem', color: '#7A90A8', marginBottom: '0.75rem' }}>
-          {filtered.length} de {allForPlan.length} prestadores relevantes
+          {filtered.length} de {cityFiltered.length} prestadores na região selecionada
           {status !== 'Todos' && ` — filtrando: ${status}`}
         </div>
 

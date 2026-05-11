@@ -3,7 +3,6 @@ import { cenarios } from './data/cenarios';
 import ExecutiveHeader from './components/ExecutiveHeader';
 import ScenarioSelector from './components/ScenarioSelector';
 import SummaryCards from './components/SummaryCards';
-import DataValidation from './components/DataValidation';
 import FinancialComparison from './components/FinancialComparison';
 import NetworkComparison from './components/NetworkComparison';
 import NetworkTable from './components/NetworkTable';
@@ -35,7 +34,6 @@ export default function App() {
 
       {/* 3–13. Conteúdo responsivo ao cenário selecionado */}
       <SummaryCards cenario={cenario} />
-      <DataValidation />
       <FinancialComparison cenario={cenario} />
       <NetworkComparison />
       <NetworkTable key={`network-${selectedId}`} cenario={cenario} />
